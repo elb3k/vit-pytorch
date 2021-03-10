@@ -1,1 +1,1 @@
-from vit_pytorch.longformer.longformer import LongformerSelfAttention, LongformerConfig
+from vit_pytorch.longformer.longformer import LongformerSelfAttention
