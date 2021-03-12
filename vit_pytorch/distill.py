@@ -4,6 +4,7 @@ from torch import nn
 from vit_pytorch.vit_pytorch import ViT
 from vit_pytorch.t2t import T2TViT
 from vit_pytorch.efficient import ViT as EfficientViT
+from vit_pytorch.vit_pytorch import LongViT
 
 from einops import rearrange, repeat
 
@@ -95,6 +96,23 @@ class DistillableEfficientViT(DistillMixin, EfficientViT):
     def _attend(self, x, mask):
         return self.transformer(x)
 
+
+class DistillableLongViT(DistillMixin, LongViT):
+    def __init__(self, *args, **kwargs):
+        super(DistillableLongViT, self).__init__(*args, **kwargs)
+        self.args = args
+        self.kwargs = kwargs
+        self.dim = kwargs['dim']
+        self.num_classes = kwargs['num_classes']
+
+    def to_vit(self):
+        v = LongViT(*self.args, **self.kwargs)
+        v.load_state_dict(self.state_dict())
+        return v
+
+    def _attend(self, x, mask):
+        return self.transformer(x)
+
 # knowledge distillation wrapper
 
 class DistillWrapper(nn.Module):
@@ -107,7 +125,7 @@ class DistillWrapper(nn.Module):
         alpha = 0.5
     ):
         super().__init__()
-        assert (isinstance(student, (DistillableViT, DistillableT2TViT, DistillableEfficientViT))) , 'student must be a vision transformer'
+        assert (isinstance(student, (DistillableViT, DistillableT2TViT, DistillableEfficientViT, DistillableLongViT))) , 'student must be a vision transformer'
 
         self.teacher = teacher
         self.student = student

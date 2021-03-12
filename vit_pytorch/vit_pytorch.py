@@ -247,7 +247,7 @@ class LongVViT(nn.Module):
     def forward(self, img):
         x = self.to_patch_embedding(img)
         b, n, _ = x.shape
-        print(f'Batch: {b}, seq: {n}')
+        # print(f'Batch: {b}, seq: {n}')
         
         cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
         x = torch.cat((cls_tokens, x), dim=1)
