@@ -114,23 +114,43 @@ def sliding_chunks_matmul_pv(prob: torch.Tensor, v: torch.Tensor, w: int):
     return context.view(bsz, num_heads, seqlen, head_dim).transpose(1, 2)
 
 
-def pad_to_window_size(input_ids: torch.Tensor, attention_mask: torch.Tensor,
-                       one_sided_window_size: int, pad_token_id: int):
+# def pad_to_window_size(input_ids: torch.Tensor, attention_mask: torch.Tensor,
+#                        one_sided_window_size: int, pad_token_id: int):
+#     '''A helper function to pad tokens and mask to work with the sliding_chunks implementation of Longformer selfattention.
+#     Input:
+#         input_ids = torch.Tensor(bsz x seqlen): ids of wordpieces
+#         attention_mask = torch.Tensor(bsz x seqlen): attention mask
+#         one_sided_window_size = int: window size on one side of each token
+#         pad_token_id = int: tokenizer.pad_token_id
+#     Returns
+#         (input_ids, attention_mask) padded to length divisible by 2 * one_sided_window_size
+#     '''
+#     w = int(2 * one_sided_window_size)
+#     seqlen = input_ids.size(1)
+#     padding_len = (w - seqlen % w) % w
+#     input_ids = F.pad(input_ids, (0, padding_len), value=pad_token_id)
+#     attention_mask = F.pad(attention_mask, (0, padding_len), value=False)  # no attention on the padding tokens
+#     return input_ids, attention_mask
+
+
+def pad_to_window_size(x: torch.Tensor, attention_mask: torch.Tensor,
+                    window_size: int, padding:float=0):
     '''A helper function to pad tokens and mask to work with the sliding_chunks implementation of Longformer selfattention.
     Input:
-        input_ids = torch.Tensor(bsz x seqlen): ids of wordpieces
-        attention_mask = torch.Tensor(bsz x seqlen): attention mask
-        one_sided_window_size = int: window size on one side of each token
-        pad_token_id = int: tokenizer.pad_token_id
+        x = torch.Tensor(bsz x seqlen x dim): input tensor
+        attention_mask = torch.Tensor(bsz x seqlen x 1): attention mask
+        window_size = int: window size on (2 sided for sliding_chunks), (1 sided for sliding_chunks_no_overlap)
+        pad_token_id = float: value for padding
     Returns
-        (input_ids, attention_mask) padded to length divisible by 2 * one_sided_window_size
+        (input_ids, attention_mask) padded to length divisible by window_size
     '''
-    w = int(2 * one_sided_window_size)
-    seqlen = input_ids.size(1)
-    padding_len = (w - seqlen % w) % w
-    input_ids = F.pad(input_ids, (0, padding_len), value=pad_token_id)
-    attention_mask = F.pad(attention_mask, (0, padding_len), value=False)  # no attention on the padding tokens
-    return input_ids, attention_mask
+    
+    seqlen = x.size(1)
+    padding_len = (window_size - seqlen % window_size) % window_size
+    x = F.pad(x, pad=(0, 0, padding_len, 0), mode='constant', value=padding)
+    # Attention mask padding 0 - no attention
+    attention_mask = F.pad(attention_mask, (0, 0, padding_len, 0), value=0)  # no attention on the padding tokens
+    return x, attention_mask
 
 
 # ========= "sliding_chunks_no_overlap": alternative implemenation of the sliding window attention =========

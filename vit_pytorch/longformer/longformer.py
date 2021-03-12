@@ -35,8 +35,8 @@ from .sliding_chunks import sliding_chunks_no_overlap_matmul_qk, sliding_chunks_
 
 
 class LongformerSelfAttention(nn.Module):
-    def __init__(self, hidden_size: int, num_heads: int, attention_window: int=256, attention_dilation: int=1, 
-        attention_mode: str='sliding_chunks', autoregressive: bool=False, dropout: float=0.):
+    def __init__(self, hidden_size: int, num_heads: int, attention_window: int=1, attention_dilation: int=1, 
+        attention_mode: str='sliding_chunks_no_overlap', autoregressive: bool=False, dropout: float=0.):
         """
         Args:
             hidden_size: hidden size of attention (input feature size)
