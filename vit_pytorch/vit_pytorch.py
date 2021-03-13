@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
+from argparse import Namespace
+
 class Residual(nn.Module):
     def __init__(self, fn):
         super().__init__()
@@ -134,7 +136,7 @@ from .longformer import LongformerSelfAttention
 from .longformer.sliding_chunks import pad_to_window_size
 
 class Longformer(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, attention_window, attention_mode='sliding_chunks', dropout = 0.):
+    def __init__(self, seq_len, dim, depth, heads, dim_head, mlp_dim, attention_window, attention_mode='sliding_chunks', emb_dropout=0., dropout = 0., pool='cls'):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
@@ -142,14 +144,51 @@ class Longformer(nn.Module):
                 Residual(PreNorm(dim, LongformerSelfAttention(dim, num_heads = heads, attention_window=attention_window, attention_mode=attention_mode))),
                 Residual(PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout)))
             ]))
-    def forward(self, x, mask = None):
+        
+        # Size for padding
+        self.attention_window = attention_window * 2 if attention_mode == 'sliding_chunks' else attention_window
+
+        # Additional
+        self.pos_embedding = nn.Parameter(torch.randn(1, seq_len + 1, dim))
+        self.cls_token = nn.Parameter(torch.rand(1, 1, dim))
+        self.dropout = nn.Dropout(emb_dropout)
+
+        assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
+        self.pool = pool
+        self.to_latent = nn.Identity()
+        
+        
+    def forward(self, x):
+
+        b, n, _ = x.shape
+        
+        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
+        x = torch.cat((cls_tokens, x), dim=1)
+        
+        x += self.pos_embedding[:, :(n + 1)]
+        x = self.dropout(x)
+
+        # Mask 1 - local attention
+        mask = torch.ones(b, n+1, 1).to(x.device)
+        # CLS extra attention
+        mask[:,0] = 2
+        # Padding
+        x, mask = pad_to_window_size(x, mask, self.attention_window)
+
         for attn, ff in self.layers:
             x = attn(x, attention_mask = mask)
             x = ff(x)
+
+        # Pooling
+        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
+        
+        # Identity
+        x = self.to_latent(x)
+        
         return x
 
 class LongViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, attention_window=1, attention_mode='sliding_chunks', pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, attention_window=1, attention_mode='sliding_chunks', pool = 'cls', channels = 3, dim_head = 64, emb_dropout=0., dropout = 0.):
         super().__init__()
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
@@ -170,7 +209,7 @@ class LongViT(nn.Module):
         # Transformer attention 
         self.attention_window = attention_window * 2 if attention_mode == 'sliding_chunks' else attention_window 
         self.attention_mode = attention_mode
-        self.transformer = Longformer(dim, depth, heads, dim_head, mlp_dim, attention_window=attention_window, attention_mode=attention_mode, dropout=dropout)
+        self.transformer = Longformer(num_patches, dim, depth, heads, dim_head, mlp_dim, attention_window=attention_window, attention_mode=attention_mode, dropout=dropout, emb_dropout=emb_dropout)
 
         self.pool = pool
         self.to_latent = nn.Identity()
@@ -181,90 +220,68 @@ class LongViT(nn.Module):
         )
 
     def forward(self, img):
+        
         x = self.to_patch_embedding(img)
-        b, n, _ = x.shape
         
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
-        x = torch.cat((cls_tokens, x), dim=1)
+        x = self.transformer(x)
         
-        x += self.pos_embedding[:, :(n + 1)]
-        x = self.dropout(x)
-
-        # Mask 1 - local attention
-        mask = torch.ones(b, n+1, 1).to(x.device)
-        # CLS extra attention
-        mask[:,0] = 2
-        # Padding
-        x, mask = pad_to_window_size(x, mask, self.attention_window)
-        x = self.transformer(x, mask)
-
-        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
-        
-        
-        x = self.to_latent(x)
         return self.mlp_head(x)
 
 
 class LongVViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, attention_window=1, attention_mode='sliding_chunks', frames=16, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
+    def __init__(self, *, image_size, patch_size, num_classes, spatial_args, temporal_args, frames=16, channels = 3):
+    # def __init__(self, args):
+          
         super().__init__()
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
-        num_patches = (image_size // patch_size) ** 2 * frames
+        num_patches = (image_size // patch_size) ** 2
 
         patch_dim = channels * patch_size ** 2
-        assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
-
         self.frames = frames
+
+        # Convert args
+        spatial_args = Namespace(**spatial_args)
+        temporal_args = Namespace(**temporal_args)
 
         self.to_patch_embedding = nn.Sequential(    
             # Collapse frame to batch
             Rearrange('b f c h w -> (b f) c h w'),
             # Original
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
-            nn.Linear(patch_dim, dim),
-            # Collapse frames to patches
-            Rearrange('(b f) c d -> b (f c) d', f=frames)
+            nn.Linear(patch_dim, spatial_args.dim),
         )
 
-        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         
-        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
-        self.dropout = nn.Dropout(emb_dropout)
+        #[Spatial] Transformer attention 
+        spatial_args.seq_len = num_patches
+        
+        self.spatial_transformer = Longformer(**vars(spatial_args))
+        
+        #Spatial to temporal rearrange
+        self.spatial2temporal = Rearrange('(b f) d -> b f d', f=frames)
 
-        # Transformer attention 
-        self.attention_window = attention_window * 2 if attention_mode == 'sliding_chunks' else attention_window 
-        self.attention_mode = attention_mode
-        self.transformer = Longformer(dim, depth, heads, dim_head, mlp_dim, attention_window=attention_window, attention_mode=attention_mode, dropout=dropout)
-
-        self.pool = pool
-        self.to_latent = nn.Identity()
-
+        #[Temporal] Transformer_attention
+        temporal_args.seq_len = frames
+        self.temporal_transformer = Longformer(**vars(temporal_args))
+        
+        
         self.mlp_head = nn.Sequential(
-            nn.LayerNorm(dim),
-            nn.Linear(dim, num_classes)
+            nn.LayerNorm(temporal_args.dim),
+            nn.Linear(temporal_args.dim, num_classes)
         )
 
     def forward(self, img):
+
         x = self.to_patch_embedding(img)
-        b, n, _ = x.shape
-        # print(f'Batch: {b}, seq: {n}')
         
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
-        x = torch.cat((cls_tokens, x), dim=1)
-        
-        x += self.pos_embedding[:, :(n + 1)]
-        x = self.dropout(x)
+        # Spatial Transformer
+        x = self.spatial_transformer(x)
 
-        # Mask 1 - local attention
-        mask = torch.ones(b, n+1, 1).to(x.device)
-        # CLS extra attention
-        mask[:,0] = 2
-        # Padding
-        x, mask = pad_to_window_size(x, mask, self.attention_window)
-        x = self.transformer(x, mask)
+        # Spatial to temporal
+        x = self.spatial2temporal(x)
 
-        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
-        
-        
-        x = self.to_latent(x)
+        # Temporal Transformer
+        x = self.temporal_transformer(x)
+
+        # Classifier
         return self.mlp_head(x)
