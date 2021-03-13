@@ -5,15 +5,15 @@ image_size: 224
 patch_size: 32
 channels: 3
 frames: 16
-num_classes: 1000
+num_classes: 101
 
 # Spatial Transformer
 spatial_args:
-  dim: 128
-  depth: 6
+  dim: 512
+  depth: 3
   heads: 8
   dim_head: 128
-  mlp_dim: 128
+  mlp_dim: 512
   attention_window: 7
   attention_mode: sliding_chunks
   emb_dropout: 0.1
@@ -22,11 +22,11 @@ spatial_args:
 
 # Temporal Transformer
 temporal_args:
-  dim: 128
-  depth: 6
+  dim: 512
+  depth: 3
   heads: 8
-  dim_head: 128
-  mlp_dim: 128
+  dim_head: 256
+  mlp_dim: 256
   attention_window: 4
   attention_mode: sliding_chunks
   emb_dropout: 0.1
