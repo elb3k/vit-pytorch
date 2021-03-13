@@ -130,3 +130,5 @@ dmypy.json
 
 # data Folder
 data/
+dataset
+weights

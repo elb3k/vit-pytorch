@@ -1,6 +1,6 @@
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 from argparse import ArgumentParser
 import torch
@@ -22,7 +22,7 @@ from utils.utils import preprocess
 # Parse arguments
 parser = ArgumentParser()
 
-parser.add_argument("--annotations", type=str, default="dataset/ucf/trainlist03.txt", help="Dataset labels path")
+parser.add_argument("--annotations", type=str, default="dataset/ucf/annotation/trainlist03.txt", help="Dataset labels path")
 parser.add_argument("--root-dir", type=str, default="dataset/ucf/frames", help="Dataset files root-dir")
 parser.add_argument("--classes", type=int, default=101, help="Number of classes")
 parser.add_argument("--frames", type=int, default=16, help="Number of frames")
@@ -33,7 +33,7 @@ parser.add_argument("--resume", type=int, default=0, help='Resume training from'
 
 # Hyperparameters
 parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
-parser.add_argument("--learning_rate", type=float, default=5e-4, help="Learning rate")
+parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate")
 parser.add_argument("--weight-decay", type=float, default=1e-6, help="Weight decay")
 parser.add_argument("--epochs", type=int, default=22, help="Number of epochs")
 parser.add_argument("--validation-split", type=float, default=0.2, help="Validation split")
@@ -47,8 +47,8 @@ args = parser.parse_args()
 print(args)
 
 # Load model
-model = LongVViT(image_size=224, patch_size=32, dim=1024, num_classes=args.classes, depth=3, heads=8, mlp_dim=128, attention_window=7, 
-                frames=frames, attention_mode='sliding_chunks', dropout=0.1, emb_dropout=0.1)
+model = LongVViT(image_size=224, patch_size=32, dim=1024, num_classes=args.classes, depth=6, heads=8, mlp_dim=128, attention_window=28, 
+                frames=args.frames, attention_mode='sliding_chunks', dropout=0.1, emb_dropout=0.1)
 
 if torch.cuda.is_available():
     model = nn.DataParallel(model).cuda()
@@ -59,9 +59,9 @@ if args.resume > 0:
 
 # Load dataset
 if args.dataset == 'ucf':
-  dataset = UCF101(args.annotations, args.root_dir, preprocess=resnet_preprocess, classes=args.classes, frames=args.frames)
+  dataset = UCF101(args.annotations, args.root_dir, preprocess=preprocess, classes=args.classes, frames=args.frames)
 elif args.dataset == 'smth':
-  dataset = SMTHV2(args.annotations, args.root_dir, preprocess=resnet_preprocess, frames=args.frames)
+  dataset = SMTHV2(args.annotations, args.root_dir, preprocess=preprocess, frames=args.frames)
 
 # Split
 train_set, val_set = random_split(dataset, [len(dataset) - int(args.validation_split * len(dataset)), int(args.validation_split * len(dataset))] )
@@ -71,7 +71,7 @@ val_loader = DataLoader(val_set, batch_size=args.batch_size, num_workers=8, pers
 
 # Loss and optimizer
 loss_func = nn.CrossEntropyLoss()
-optimizer = SGD(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+optimizer = Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
 softmax = nn.LogSoftmax(dim=1)
 
