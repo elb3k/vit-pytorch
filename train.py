@@ -23,13 +23,14 @@ from utils.utils import preprocess
 # Parse arguments
 parser = ArgumentParser()
 
-parser.add_argument("--annotations", type=str, default="dataset/ucf/annotation/trainlist03.txt", help="Dataset labels path")
-parser.add_argument("--root-dir", type=str, default="dataset/ucf/frames", help="Dataset files root-dir")
-parser.add_argument("--classes", type=int, default=101, help="Number of classes")
+parser.add_argument("--annotations", type=str, default="dataset/smth/train.json", help="Dataset labels path")
+parser.add_argument("--val-annotations", type=str, default="dataset/smth/val.json", help="Validation labels")
+parser.add_argument("--root-dir", type=str, default="dataset/smth/videos", help="Dataset files root-dir")
+parser.add_argument("--classes", type=int, default=174, help="Number of classes")
 parser.add_argument("--config", type=str, default='configs/longVViT.yaml', help="Config file")
 
-parser.add_argument("--dataset", choices=['ucf', 'smth'], default='ucf')
-parser.add_argument("--weight-path", type=str, default="weights/ucf/v1", help='Path to save weights')
+parser.add_argument("--dataset", choices=['ucf', 'smth'], default='smth')
+parser.add_argument("--weight-path", type=str, default="weights/smth/v1", help='Path to save weights')
 parser.add_argument("--resume", type=int, default=0, help='Resume training from')
 
 # Hyperparameters
@@ -65,12 +66,13 @@ if args.resume > 0:
 
 # Load dataset
 if args.dataset == 'ucf':
-  dataset = UCF101(args.annotations, args.root_dir, preprocess=preprocess, classes=args.classes, frames=args.frames)
+  train_set = UCF101(args.annotations, args.root_dir, preprocess=preprocess, classes=args.classes, frames=cfg.firames)
+  val_set = UCF101(args.val_annotations, args.root_dir, preprocess=preprocess, classes=args.classes, frames=cfg.firames) 
 elif args.dataset == 'smth':
-  dataset = SMTHV2(args.annotations, args.root_dir, preprocess=preprocess, frames=args.frames)
+  train_set = SMTHV2(args.annotations, args.root_dir, preprocess=preprocess, frames=cfg.frames)
+  val_set = SMTHV2(args.val_annotations, args.root_dir, preprocess=preprocess, frames=cfg.frames)
 
 # Split
-train_set, val_set = random_split(dataset, [len(dataset) - int(args.validation_split * len(dataset)), int(args.validation_split * len(dataset))] )
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=8, persistent_workers=True)
 val_loader = DataLoader(val_set, batch_size=args.batch_size, num_workers=8, persistent_workers=True)
 

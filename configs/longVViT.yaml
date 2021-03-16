@@ -4,8 +4,8 @@
 image_size: 224
 patch_size: 32
 channels: 3
-frames: 16
-num_classes: 101
+frames: 32
+num_classes: 174
 
 # Spatial Transformer
 spatial_args:
