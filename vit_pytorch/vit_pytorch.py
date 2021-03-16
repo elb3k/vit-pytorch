@@ -201,18 +201,8 @@ class LongViT(nn.Module):
             nn.Linear(patch_dim, dim),
         )
 
-        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
-        
-        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
-        self.dropout = nn.Dropout(emb_dropout)
-
         # Transformer attention 
-        self.attention_window = attention_window * 2 if attention_mode == 'sliding_chunks' else attention_window 
-        self.attention_mode = attention_mode
         self.transformer = Longformer(num_patches, dim, depth, heads, dim_head, mlp_dim, attention_window=attention_window, attention_mode=attention_mode, dropout=dropout, emb_dropout=emb_dropout)
-
-        self.pool = pool
-        self.to_latent = nn.Identity()
 
         self.mlp_head = nn.Sequential(
             nn.LayerNorm(dim),

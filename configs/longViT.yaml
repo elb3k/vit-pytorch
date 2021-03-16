@@ -1,0 +1,19 @@
+# Template for single LongVViT
+
+# General input/ouput info
+image_size: 256
+patch_size: 32
+channels: 3
+num_classes: 1000
+
+# Spatial Transformer
+dim: 768
+depth: 3
+heads: 12
+dim_head: 128
+mlp_dim: 3072
+attention_window: 8
+attention_mode: sliding_chunks
+emb_dropout: 0.1
+dropout: 0.1
+pool: cls
