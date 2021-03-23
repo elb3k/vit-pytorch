@@ -149,7 +149,7 @@ class Longformer(nn.Module):
         self.attention_window = attention_window * 2 if attention_mode == 'sliding_chunks' else attention_window
 
         # Additional
-        self.pos_embedding = nn.Parameter(torch.randn(1, seq_len + 1, dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, seq_len + 1, dim)) # [CLS Token] + sequence
         self.cls_token = nn.Parameter(torch.rand(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
@@ -158,8 +158,8 @@ class Longformer(nn.Module):
         self.to_latent = nn.Identity()
         
         
-    def forward(self, x):
-
+    def forward(self, x, distill_token=None):
+        distilling = distill_token is not None
         b, n, _ = x.shape
         
         cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
@@ -167,6 +167,12 @@ class Longformer(nn.Module):
         
         x += self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
+
+        # Add distillation token
+        if distilling:
+            distill_tokens = repeat(distill_token, '() n d -> b n d', b=b)
+            x = torch.cat((x, distill_tokens), dim=1)
+            n = n + 1
 
         # Mask 1 - local attention
         mask = torch.ones(b, n+1, 1).to(x.device)
@@ -179,13 +185,19 @@ class Longformer(nn.Module):
             x = attn(x, attention_mask = mask)
             x = ff(x)
 
+        # Get distillation token
+        if distilling:
+            distill_token = x[:, n-1]
         # Pooling
         x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
         
         # Identity
         x = self.to_latent(x)
         
-        return x
+        if distilling:
+            return x, distill_token
+        else:
+            return x
 
 class LongViT(nn.Module):
     def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, attention_window=1, attention_mode='sliding_chunks', pool = 'cls', channels = 3, dim_head = 64, emb_dropout=0., dropout = 0.):

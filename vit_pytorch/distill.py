@@ -110,8 +110,25 @@ class DistillableLongViT(DistillMixin, LongViT):
         v.load_state_dict(self.state_dict())
         return v
 
-    def _attend(self, x, mask):
-        return self.transformer(x)
+    def _attend(self, x, mask, distill_token=None):
+        return self.transformer(x, distill_token=distill_token)
+
+    def forward(self, img, distill_token = None, mask = None):
+        distilling = exists(distill_token)
+        x = self.to_patch_embedding(img)
+        b, n, _ = x.shape
+
+        if distilling:
+            x, distill_tokens = self._attend(x, mask, distill_token)
+        else:
+            x = self._attend(x, mask)
+
+        out = self.mlp_head(x)
+
+        if distilling:
+            return out, distill_tokens
+
+        return out
 
 # knowledge distillation wrapper
 
