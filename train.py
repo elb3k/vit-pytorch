@@ -35,7 +35,7 @@ parser.add_argument("--resume", type=int, default=0, help='Resume training from'
 
 # Hyperparameters
 parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
-parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate")
+parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate")
 parser.add_argument("--weight-decay", type=float, default=1e-6, help="Weight decay")
 parser.add_argument("--epochs", type=int, default=22, help="Number of epochs")
 parser.add_argument("--validation-split", type=float, default=0.2, help="Validation split")
