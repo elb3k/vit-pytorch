@@ -17,7 +17,7 @@ from torchvision import transforms
 
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
-from torch.optim import Adam, SGD, Adagrad
+from torch.optim import AdamW, SGD, Adagrad
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils.utils import preprocess
 
@@ -29,17 +29,17 @@ parser.add_argument("--root-dir", type=str, default="dataset/imagenet/train", he
 parser.add_argument("--val-annotations", type=str, default="dataset/imagenet/annotations/val.json", help="Validation labels")
 parser.add_argument("--val-root-dir", type=str, default="dataset/imagenet/validate", help="Dataset files root-dir")
 parser.add_argument("--classes", type=int, default=1000, help="Number of classes")
-parser.add_argument("--config", type=str, default='configs/linViT.yaml', help="Config file")
+parser.add_argument("--config", type=str, default='configs/longViT.yaml', help="Config file")
 
 parser.add_argument("--dataset", choices=['imagenet'], default='imagenet')
-parser.add_argument("--model", choices=['longViT', 'linViT'], default='linViT')
-parser.add_argument("--weight-path", type=str, default="weights/linvit/v1", help='Path to save weights')
-parser.add_argument("--log-path", type=str, default="log/linvit/v1", help='Path to save weights')
+parser.add_argument("--model", choices=['longViT', 'linViT'], default='longViT')
+parser.add_argument("--weight-path", type=str, default="weights/longvit/v1", help='Path to save weights')
+parser.add_argument("--log-path", type=str, default="log/longvit/v1", help='Path to save weights')
 parser.add_argument("--resume", type=int, default=0, help='Resume training from')
 
 # Hyperparameters
 parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
-parser.add_argument("--learning_rate", type=float, default=3e-3, help="Learning rate")
+parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate")
 parser.add_argument("--weight-decay", type=float, default=1e-6, help="Weight decay")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
 
@@ -84,7 +84,7 @@ tensorboard = SummaryWriter(args.log_path)
 
 # Loss and optimizer
 loss_func = nn.CrossEntropyLoss()
-optimizer = SGD(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+optimizer = AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
 softmax = nn.LogSoftmax(dim=1)
 
