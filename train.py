@@ -24,20 +24,21 @@ from utils.utils import preprocess
 # Parse arguments
 parser = ArgumentParser()
 
-parser.add_argument("--annotations", type=str, default="dataset/kinetics/annotations.json", help="Dataset labels path")
-parser.add_argument("--root-dir", type=str, default="dataset/kinetics/train", help="Dataset files root-dir")
-parser.add_argument("--val-annotations", type=str, default="dataset/kinetics/val.json", help="Validation labels")
-parser.add_argument("--val-root-dir", type=str, default="dataset/kinetics/val", help="Dataset files root-dir")
+parser.add_argument("--annotations", type=str, default="dataset/imagenet/annotations/annotations.json", help="Dataset labels path")
+parser.add_argument("--root-dir", type=str, default="dataset/imagenet/train", help="Dataset files root-dir")
+parser.add_argument("--val-annotations", type=str, default="dataset/imagenet/annotations/val.json", help="Validation labels")
+parser.add_argument("--val-root-dir", type=str, default="dataset/imagenet/validate", help="Dataset files root-dir")
 parser.add_argument("--classes", type=int, default=1000, help="Number of classes")
 parser.add_argument("--config", type=str, default='configs/longViT.yaml', help="Config file")
 
 parser.add_argument("--dataset", choices=['imagenet'], default='imagenet')
 parser.add_argument("--weight-path", type=str, default="weights/imagenet/v1", help='Path to save weights')
+parser.add_argument("--log-path", type=str, default="log/imagenet/v1", help='Path to save weights')
 parser.add_argument("--resume", type=int, default=0, help='Resume training from')
 
 # Hyperparameters
-parser.add_argument("--batch-size", type=int, default=64, help="Batch size")
-parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate")
+parser.add_argument("--batch-size", type=int, default=128, help="Batch size")
+parser.add_argument("--learning_rate", type=float, default=3e-3, help="Learning rate")
 parser.add_argument("--weight-decay", type=float, default=1e-6, help="Weight decay")
 parser.add_argument("--epochs", type=int, default=100, help="Number of epochs")
 
@@ -74,10 +75,12 @@ if args.dataset == 'imagenet':
 train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=16, persistent_workers=True)
 val_loader = DataLoader(val_set, batch_size=args.batch_size, num_workers=16, persistent_workers=True)
 
+# Tensorboard
+tensorboard = SummaryWriter(args.log_path)
 
 # Loss and optimizer
 loss_func = nn.CrossEntropyLoss()
-optimizer = Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+optimizer = SGD(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
 softmax = nn.LogSoftmax(dim=1)
 
@@ -100,8 +103,8 @@ for epoch in range(max(args.resume+1, 1), args.epochs+1):
     # # Adjust learning rate
     # adjust_learning_rate(optimizer, epoch)
 
-    progress = tqdm(train_loader, desc=f"Epoch: {epoch}, loss: 0.000")
-    for src, target in progress:
+    progress = tqdm(enumerate(train_loader), total=len(train_loader), desc=f"Epoch: {epoch}, loss: 0.000")
+    for i, (src, target) in progress:
         
         # print(src.shape, target.shape)
         # src, target = train_loader[i] 
