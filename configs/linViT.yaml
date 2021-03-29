@@ -1,0 +1,20 @@
+# Template for single LinViT
+
+# General input/ouput info
+image_size: 224
+patch_size: 16
+channels: 3
+num_classes: 1000
+
+# Spatial Transformer
+dim: 768
+depth: 12
+heads: 12
+dim_head: 96
+mlp_dim: 3072
+k: 256
+one_kv_head: True
+share_kv: True
+emb_dropout: 0.1
+dropout: 0.1
+pool: cls

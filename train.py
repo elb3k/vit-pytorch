@@ -11,7 +11,7 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm, trange
 
-from vit_pytorch import LongViT
+from vit_pytorch import LongViT, LinViT
 from utils.data import ImageNet
 from torchvision import transforms
 
@@ -29,11 +29,12 @@ parser.add_argument("--root-dir", type=str, default="dataset/imagenet/train", he
 parser.add_argument("--val-annotations", type=str, default="dataset/imagenet/annotations/val.json", help="Validation labels")
 parser.add_argument("--val-root-dir", type=str, default="dataset/imagenet/validate", help="Dataset files root-dir")
 parser.add_argument("--classes", type=int, default=1000, help="Number of classes")
-parser.add_argument("--config", type=str, default='configs/longViT.yaml', help="Config file")
+parser.add_argument("--config", type=str, default='configs/linViT.yaml', help="Config file")
 
 parser.add_argument("--dataset", choices=['imagenet'], default='imagenet')
-parser.add_argument("--weight-path", type=str, default="weights/imagenet/v1", help='Path to save weights')
-parser.add_argument("--log-path", type=str, default="log/imagenet/v1", help='Path to save weights')
+parser.add_argument("--model", choices=['longViT', 'linViT'], default='linViT')
+parser.add_argument("--weight-path", type=str, default="weights/linvit/v1", help='Path to save weights')
+parser.add_argument("--log-path", type=str, default="log/linvit/v1", help='Path to save weights')
 parser.add_argument("--resume", type=int, default=0, help='Resume training from')
 
 # Hyperparameters
@@ -57,7 +58,10 @@ with open(args.config) as f:
 cfg = Namespace(**cfg)
 
 # Load model
-model = LongViT(**vars(cfg))
+if args.model == 'longViT':
+    model = LongViT(**vars(cfg))
+elif args.model == 'linViT':
+    model = LinViT(**vars(cfg))
 
 if torch.cuda.is_available():
     model = nn.DataParallel(model).cuda()

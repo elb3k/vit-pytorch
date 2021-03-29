@@ -224,7 +224,7 @@ class LongViT(nn.Module):
 from .linformer import Linformer
 
 class LinViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, k=64, pool = 'cls', channels = 3, dim_head = 64, emb_dropout=0., dropout = 0.):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, k=64, dim_head=None, one_kv_head=False, share_kv=False, pool = 'cls', channels = 3, emb_dropout=0., dropout = 0.):
         super().__init__()
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
@@ -244,7 +244,7 @@ class LinViT(nn.Module):
        
 
         # Transformer attention 
-        self.transformer = Linformer(dim, num_patches, depth, mlp_dim, k, heads, dim_head, dropout=dropout)
+        self.transformer = Linformer(dim, num_patches, depth, mlp_dim, k, heads, dim_head, one_kv_head, share_kv, dropout=dropout)
 
         # Pooling
         assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
